@@ -80,7 +80,7 @@ class MythrilVerifier:
                     "--solv",
                     solv,
                     "--execution-timeout",
-                    str(max(5, self.timeout_s // 2)),
+                    str(max(5, self.timeout_s // 4)),
                     "--max-depth",
                     "32",
                 ],
@@ -95,11 +95,37 @@ class MythrilVerifier:
         output = (proc.stdout + "\n" + proc.stderr)[-4000:]
         elapsed = time.time() - started
         lowered = output.lower()
-        if proc.returncode != 0 and "analysis results" not in lowered:
-            return Verdict.SKIPPED, "myth analysis error:\n" + output, elapsed
-        class_hint = finding.vuln_class.split("-")[0]
-        if class_hint in lowered and finding.function.lower() in lowered:
-            return Verdict.CONFIRMED, output, elapsed
-        if "analysis results" in lowered or "no issues" in lowered:
+        has_issues = "swc id" in lowered
+        fatal = ("traceback" in lowered or "unrecognized argument" in lowered) and not has_issues
+        if proc.returncode not in (0, 1) and not has_issues:
+            if fatal or proc.returncode != 0:
+                return Verdict.SKIPPED, "myth analysis error:\n" + output, elapsed
+        if has_issues:
+            if _matches_claim(lowered, finding):
+                return Verdict.CONFIRMED, output, elapsed
+            return Verdict.REFUTED, output, elapsed
+        if "no issues" in lowered or proc.returncode == 0:
             return Verdict.REFUTED, output, elapsed
         return Verdict.SKIPPED, "inconclusive mythril output:\n" + output, elapsed
+
+
+_SWC_HINTS: dict[str, list[str]] = {
+    "reentrancy": ["reentrancy", "re-enter", "swc id: 107"],
+    "access-control": ["swc id: 106", "swc id: 115", "authorization", "unprotected"],
+    "arbitrary-send-eth": ["swc id: 105", "unprotected"],
+    "delegatecall-to-untrusted": ["delegatecall", "swc id: 112"],
+    "unchecked-arithmetic": ["swc id: 101", "integer"],
+    "bad-randomness": ["swc id: 120", "block hash", "blockhash"],
+    "time-manipulation": ["swc id: 116", "timestamp"],
+    "denial-of-service": ["swc id: 128", "denial of service"],
+}
+
+
+def _matches_claim(lowered_output: str, finding: LLMFinding) -> bool:
+    base = finding.vuln_class.split("-")[0]
+    hints = _SWC_HINTS.get(finding.vuln_class) or _SWC_HINTS.get(base) or []
+    class_hit = any(h in lowered_output for h in hints) or any(
+        w in lowered_output for w in finding.vuln_class.replace("-", " ").split()
+    )
+    func_hit = finding.function.lower() in lowered_output
+    return class_hit and func_hit
