@@ -67,6 +67,7 @@ class ContractAnalysis:
     contracts: list[str] = field(default_factory=list)
     slices: list[FunctionSlice] = field(default_factory=list)
     call_graph: list[CallEdge] = field(default_factory=list)
+    constructor_params: dict[str, list[str]] = field(default_factory=dict)
     compile_ok: bool = True
     compile_error: str = ""
 
@@ -83,6 +84,7 @@ class LLMFinding:
     attack_path: list[str] = field(default_factory=list)  # CoT attack trace
     sink: str = ""           # the exploited statement (external call / state write)
     params: list[str] = field(default_factory=list)  # canonical param types, filled by the pipeline
+    ctor_params: list[str] = field(default_factory=list)  # target constructor types, filled by the pipeline
     confidence: float = 0.0
     raw: dict[str, Any] = field(default_factory=dict)
 

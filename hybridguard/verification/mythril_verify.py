@@ -2,12 +2,51 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import time
 from pathlib import Path
 
 from hybridguard.models import LLMFinding, Verdict
+
+_SOLCX_DIR = Path.home() / ".solcx"
+
+
+def _installed_solc_versions() -> list[tuple[int, int, int]]:
+    versions = []
+    for p in _SOLCX_DIR.glob("solc-v*"):
+        try:
+            parts = tuple(int(x) for x in p.name.replace("solc-v", "").split("."))
+            if len(parts) == 3:
+                versions.append(parts)  # type: ignore[arg-type]
+        except ValueError:
+            continue
+    return sorted(versions)
+
+
+def _solv_version(contract_path: str | Path) -> str:
+    """Pick the highest locally installed solc version compatible with the target pragma."""
+    installed = _installed_solc_versions()
+    if not installed:
+        return "0.8.20"
+    try:
+        head = Path(contract_path).read_text(errors="replace")[:2000]
+    except OSError:
+        return f"{installed[-1][0]}.{installed[-1][1]}.{installed[-1][2]}"
+    upper = None
+    for m in re.finditer(r"pragma solidity\s+([^;]+);", head):
+        for v in re.finditer(r"(\d+)\.(\d+)\.(\d+)", m.group(1)):
+            t = tuple(int(x) for x in v.groups())
+            if upper is None or t > upper:
+                upper = t
+    if upper is None:
+        upper = installed[-1]
+    compatible = [v for v in installed if v <= upper and v[:2] == upper[:2]] or [
+        v for v in installed if v <= upper
+    ]
+    chosen = compatible[-1] if compatible else installed[-1]
+    return f"{chosen[0]}.{chosen[1]}.{chosen[2]}"
 
 
 class MythrilVerifier:
@@ -31,6 +70,7 @@ class MythrilVerifier:
         if not self.available():
             return Verdict.SKIPPED, "myth binary not found (pip install mythril)", 0.0
         started = time.time()
+        solv = _solv_version(contract_path)
         try:
             proc = subprocess.run(
                 [
@@ -38,7 +78,7 @@ class MythrilVerifier:
                     "analyze",
                     str(contract_path),
                     "--solv",
-                    "0.8.20",
+                    solv,
                     "--execution-timeout",
                     str(max(5, self.timeout_s // 2)),
                     "--max-depth",

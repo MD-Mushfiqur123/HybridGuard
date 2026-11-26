@@ -11,6 +11,7 @@ Stage 2 of the HybridGuard pipeline:
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 
 from slither.core.cfg.node import NodeType
@@ -49,6 +50,51 @@ except ImportError:  # pragma: no cover
 
 
 BALANCE_HINT = re.compile(r"balance|shares|staked|supply|vault|claim|reward|withdraw|mint|burn|unwrap|swap", re.IGNORECASE)
+
+_PRAGMA_RE = re.compile(r"pragma solidity\s+[^;]*?(\d+)\.(\d+)\.(\d+)\s*;")
+_PRAGMA_MAX_RE = re.compile(r"[<>\^]?=?\s*(\d+)\.(\d+)\.(\d+)")
+
+
+def _required_pragma_version(path: str) -> str | None:
+    """Highest compiler version the file's pragma allows, for solc_version override."""
+    try:
+        head = Path(path).read_text(errors="replace")[:2000]
+    except OSError:
+        return None
+    best = None
+    for m in _PRAGMA_RE.finditer(head):
+        for v in _PRAGMA_MAX_RE.finditer(m.group(0)):
+            triple = tuple(int(x) for x in v.groups())
+            if best is None or triple > best:
+                best = triple
+    return ".".join(str(x) for x in best) if best else None
+
+
+def _auto_remaps(path: str) -> list[str]:
+    """Foundry-style remaps (forge-std etc.) when the target lives in a repo with lib/."""
+    p = Path(path).resolve()
+    for base in p.parents:
+        lib = base / "lib"
+        if lib.is_dir():
+            remaps = []
+            for dep in sorted(lib.iterdir()):
+                src = dep / "src"
+                if src.is_dir():
+                    remaps.append(f"{dep.name}/={src}/")
+            return remaps
+        if (base / ".git").exists() or base == base.parent:
+            break
+    return []
+
+
+def _resolve_solc_binary(version: str) -> str | None:
+    """Prefer a solc-select artifact for the required version, else fall back to PATH solc."""
+    home = Path.home() / ".solc-select" / "artifacts" / f"solc-{version}" / f"solc-{version}"
+    if home.exists():
+        return str(home)
+    return shutil.which("solc")
+
+
 IR_FETCH_OPS = {"ASSIGNMENT", "BINARY", "UNARY", "INDEX", "MEMBER", "RETURN"}
 
 
@@ -63,18 +109,34 @@ class StaticSlicer:
         analysis = ContractAnalysis(path=path)
         try:
             kwargs = {}
-            if solc_version:
-                kwargs["solc_version"] = solc_version
+            version = solc_version or _required_pragma_version(path)
+            binary = _resolve_solc_binary(version) if version else None
+            if binary:
+                kwargs["solc"] = binary
+            remaps = _auto_remaps(path)
+            if remaps:
+                kwargs["solc_remaps"] = remaps
+                kwargs["compile_force_framework"] = "solc"
             sl = Slither(path, **kwargs)
         except Exception as exc:  # compile failure, unsupported pragma, ...
             analysis.compile_ok = False
             analysis.compile_error = str(exc).splitlines()[0] if str(exc) else repr(exc)
             return analysis
 
+        target_file = Path(path).resolve()
         for contract in sl.contracts:
             if contract.is_interface or contract.is_library:
                 continue
             analysis.contracts.append(contract.name)
+            if not self._declared_in(contract, target_file):
+                continue
+            ctor_params = [
+                _canonical_type(v.type)
+                for ctor in contract.constructors
+                for v in ctor.parameters
+            ]
+            if ctor_params:
+                analysis.constructor_params[contract.name] = ctor_params
             for fn in contract.functions_declared:
                 if fn.is_constructor or fn.name in ("receive", "fallback"):
                     # constructors and fallbacks are still reachable via the call graph
@@ -83,6 +145,8 @@ class StaticSlicer:
 
         for contract in sl.contracts:
             if contract.is_interface or contract.is_library:
+                continue
+            if not self._declared_in(contract, target_file):
                 continue
             for fn in contract.functions_declared:
                 analysis.slices.append(self._slice_function(contract.name, fn))
@@ -217,6 +281,14 @@ class StaticSlicer:
             return "\n".join(snippet)
         except Exception:
             return ""
+
+    @staticmethod
+    def _declared_in(contract, target_file: Path) -> bool:
+        try:
+            src = Path(contract.source_mapping.filename.absolute).resolve()
+        except Exception:
+            return True
+        return src == target_file
 
     def _edges_from(self, fn: Function) -> list[CallEdge]:
         edges: list[CallEdge] = []

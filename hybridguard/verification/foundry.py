@@ -69,7 +69,7 @@ def _default_args(params: list[str]) -> str:
             args.append('""')
         elif "bool" in t:
             args.append("true")
-        elif "[]" in t:
+
             args.append(f"new {t}(0)")
         else:
             args.append("1")
@@ -80,13 +80,63 @@ def _signature(func: str, params: list[str]) -> str:
     return f"{func}({','.join(params)})"
 
 
-def _harness(import_name: str, target: str, func: str, kind: str, params: list[str] | None = None) -> str:
+PRAGMA_RE = re.compile(r"pragma solidity\s+[^;]*?(\d+)\.(\d+)\.(\d+)\s*;")
+MAX_VERSION_RE = re.compile(r"[<>\^]?=?\s*(\d+)\.(\d+)\.(\d+)")
+
+
+def _target_pragma(contract_path: str | Path) -> str | None:
+    """Return 'X.Y.Z' if the target can be compiled by the auto-harness (>= 0.6), else None."""
+    try:
+        head = Path(contract_path).read_text(errors="replace")[:2000]
+    except OSError:
+        return None
+    best = None
+    for m in PRAGMA_RE.finditer(head):
+        for v in MAX_VERSION_RE.finditer(m.group(0)):
+            major, minor, patch = (int(x) for x in v.groups())
+            if best is None or (major, minor, patch) > best:
+                best = (major, minor, patch)
+    if best is None or best < (0, 6, 0):
+        return None
+    return ".".join(str(x) for x in best)
+
+
+def _ctor_args(ctor_types: list[str] | None) -> str:
+    if not ctor_types:
+        return ""
+    args = []
+    for t in ctor_types:
+        if "address" in t:
+            args.append("address(0xBAD)")
+        elif "bytes32" in t:
+            args.append("bytes32(0)")
+        elif "bytes" in t or "string" in t:
+            args.append('""')
+        elif "bool" in t:
+            args.append("true")
+
+            args.append(f"new {t}(0)")
+        else:
+            args.append("1")
+    return ", ".join(args)
+
+
+def _harness(
+    import_name: str,
+    target: str,
+    func: str,
+    kind: str,
+    params: list[str] | None = None,
+    pragma: str = "0.8.20",
+    ctor_types: list[str] | None = None,
+) -> str:
     params = params or []
     sig = _signature(func, params)
     args = _default_args(params)
+    ctor = _ctor_args(ctor_types)
     head = (
         "// SPDX-License-Identifier: MIT\n"
-        "pragma solidity ^0.8.0;\n\n"
+        f"pragma solidity ^{pragma};\n\n"
         f"import \"src/{import_name}.sol\" as Target;\n\n"
         f"{_VM_IFACE}\n"
     )
@@ -104,11 +154,14 @@ contract ReentrantAttacker {{
 
     /// Try the common entry-point names so the harness works across contracts.
     function fundSelf() public payable {{
-        string[4] memory names = ["deposit", "stake", "contribute", "addLiquidity"];
-        for (uint256 i = 0; i < names.length; i++) {{
-            (bool ok, ) = address(vault).call{{value: 1 ether}}(abi.encodeWithSignature(string.concat(names[i], "()")));
-            if (ok) return;
-        }}
+        (bool ok1, ) = address(vault).call{{value: 1 ether}}(abi.encodeWithSignature("deposit()"));
+        if (ok1) return;
+        (bool ok2, ) = address(vault).call{{value: 1 ether}}(abi.encodeWithSignature("stake()"));
+        if (ok2) return;
+        (bool ok3, ) = address(vault).call{{value: 1 ether}}(abi.encodeWithSignature("contribute()"));
+        if (ok3) return;
+        (bool ok4, ) = address(vault).call{{value: 1 ether}}(abi.encodeWithSignature("addLiquidity()"));
+        ok4;
     }}
 
     function attack() external payable {{
@@ -130,7 +183,7 @@ contract ExploitTest is HgTest {{
     ReentrantAttacker internal attacker;
 
     function setUp() public {{
-        target = new Target.{target}{{value: 10 ether}}();
+        target = new Target.{target}{{value: 10 ether}}({ctor});
         attacker = (new ReentrantAttacker){{value: 2 ether}}(target);
     }}
 
@@ -150,7 +203,7 @@ contract ExploitTest is HgTest {{
     Target.{target} internal target;
 
     function setUp() public {{
-        target = new Target.{target}();
+        target = new Target.{target}({ctor});
         vm.deal(address(target), 10 ether);
     }}
 
@@ -169,7 +222,7 @@ contract ExploitTest is HgTest {{
     Target.{target} internal target;
 
     function setUp() public {{
-        target = new Target.{target}();
+        target = new Target.{target}({ctor});
         vm.deal(address(target), 10 ether);
     }}
 
@@ -190,7 +243,7 @@ contract ExploitTest is HgTest {{
     Target.{target} internal target;
 
     function setUp() public {{
-        target = new Target.{target}();
+        target = new Target.{target}({ctor});
         vm.deal(address(target), 10 ether);
     }}
 
@@ -204,6 +257,52 @@ contract ExploitTest is HgTest {{
     }}
 }}
 """
+
+
+_IMPORT_RE = re.compile(r"import\s+[^;]*?[\'\"]([^\'\";]+)[\'\"]")
+
+
+def _dep_name(path: Path) -> str:
+    """Canonical flattened filename derived from the resolved source path."""
+    return re.sub(r"[^\w.]", "_", str(path.resolve()))
+
+
+def _copy_with_local_imports(target: Path, dst_root: Path, seen: set[Path] | None = None) -> None:
+    """Copy the target plus every local (relative-path) .sol import transitively.
+
+    Everything is flattened into dst_root; each dependency is stored under a
+    canonical name derived from its resolved source path and every importer's
+    specifiers are rewritten to "./<canonical>" so solc resolves them (solc
+    treats bare-name imports as root-relative, and the same file may be reached
+    through different relative specs)."""
+    seen = set() if seen is None else seen
+    target = target.resolve()
+    text = _copy_target(target, dst_root, seen)
+    (dst_root / target.name).write_text(text)
+
+
+def _copy_target(target: Path, dst_root: Path, seen: set[Path]) -> str:
+    if target in seen:
+        return (dst_root / _dep_name(target)).read_text(errors="replace")
+    seen.add(target)
+    text = target.read_text(errors="replace")
+    for m in _IMPORT_RE.finditer(text):
+        spec = m.group(1)
+        if spec.startswith(("forge-std", "@")):
+            continue
+        candidate = (target.parent / spec).resolve()
+        if candidate.suffix == ".sol" and candidate.exists():
+            flat = f"./{_dep_name(candidate)}"
+            text = text.replace(f'"{spec}"', f'"{flat}"').replace(f"'{spec}'", f"'{flat}'")
+            _copy_target(candidate, dst_root, seen)
+    (dst_root / _dep_name(target)).write_text(text)
+    return text
+
+
+def _auto_remaps_str(contract_path: str | Path) -> list[str]:
+    from hybridguard.slicing.slicer import _auto_remaps
+
+    return [r for r in _auto_remaps(str(Path(contract_path).resolve())) if r.startswith("forge-std/")]
 
 
 _KIND_BY_CLASS = {
@@ -232,9 +331,17 @@ class FoundryVerifier:
     def verify(self, finding: LLMFinding, contract_path: str | Path) -> tuple[Verdict, str, float]:
         if not self.available():
             return Verdict.SKIPPED, "forge binary not found (install Foundry: https://getfoundry.sh)", 0.0
+        target_pragma = _target_pragma(contract_path)
+        if target_pragma is None:
+            return (
+                Verdict.SKIPPED,
+                "target requires solc < 0.6 - not supported by the auto-harness",
+                0.0,
+            )
         started = time.time()
         try:
-            proj = self._project_dir(contract_path)
+            remaps = _auto_remaps_str(contract_path)
+            proj = self._project_dir(contract_path, remaps)
             harness = self._harness_path(proj, finding)
             harness.parent.mkdir(parents=True, exist_ok=True)
             harness.write_text(
@@ -244,6 +351,8 @@ class FoundryVerifier:
                     func=finding.function,
                     kind=_KIND_BY_CLASS.get(finding.vuln_class, "generic"),
                     params=getattr(finding, "params", []),
+                    ctor_types=getattr(finding, "ctor_params", []),
+                    pragma=target_pragma,
                 )
             )
             ok, output = self._run_tests(proj)
@@ -256,14 +365,15 @@ class FoundryVerifier:
 
     # ------------------------------------------------------------------ #
 
-    def _project_dir(self, contract_path: str | Path) -> Path:
+    def _project_dir(self, contract_path: str | Path, remaps: list[str] | None = None) -> Path:
         proj = self.workdir / Path(contract_path).stem
         src = proj / "src"
         if not src.exists():
             src.mkdir(parents=True, exist_ok=True)
             (proj / "foundry.toml").write_text(_toml(self.fuzz_runs))
-        target = src / Path(contract_path).name
-        shutil.copy2(contract_path, target)
+            if remaps:
+                (proj / "remappings.txt").write_text("\n".join(remaps) + "\n")
+        _copy_with_local_imports(Path(contract_path).resolve(), src)
         return proj
 
     def _harness_path(self, proj: Path, finding: LLMFinding) -> Path:

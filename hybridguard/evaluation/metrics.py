@@ -8,6 +8,7 @@ publication-quality figures (300 DPI) with matplotlib.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -76,6 +77,7 @@ def evaluate_reports(
     reports: list[ScanReport],
     labels: dict[str, list[str]] | None = None,
     tool_name: str = "HybridGuard",
+    mode: str = "strict",
 ) -> ToolResult:
     """Score scan reports against per-contract ground-truth labels.
 
@@ -100,17 +102,34 @@ def evaluate_reports(
             if key in lookup:
                 contract_labels = lookup[key]
                 break
-        confirmed_classes = {vf.finding.vuln_class for vf in report.findings if vf.verdict == Verdict.CONFIRMED}
-        for vf in report.findings:
-            if vf.verdict != Verdict.CONFIRMED:
-                result.false_positives += 1
-            elif _matches_any(vf.finding.vuln_class, contract_labels):
-                result.true_positives += 1
-            else:
-                result.false_positives += 1
+        if mode == "detection":
+            # Unverified (skipped) findings still count as reported candidates;
+            # only REFUTED findings are excluded (they were proven hallucinations).
+            confirmed_classes = {
+                vf.finding.vuln_class for vf in report.findings if vf.verdict != Verdict.REFUTED
+            }
+            for vf in report.findings:
+                if vf.verdict == Verdict.REFUTED:
+                    continue
+                if _matches_any(vf.finding.vuln_class, contract_labels):
+                    result.true_positives += 1
+                else:
+                    result.false_positives += 1
+        else:
+            confirmed_classes = {
+                vf.finding.vuln_class for vf in report.findings if vf.verdict == Verdict.CONFIRMED
+            }
+            for vf in report.findings:
+                if vf.verdict != Verdict.CONFIRMED:
+                    result.false_positives += 1
+                elif _matches_any(vf.finding.vuln_class, contract_labels):
+                    result.true_positives += 1
+                else:
+                    result.false_positives += 1
         if contract_labels:
             for label in contract_labels:
-                if not (confirmed_classes & _label_aliases(label)):
+                aliases = _label_aliases(label)
+                if aliases is None or not (confirmed_classes & aliases):
                     result.false_negatives += 1
         elif not confirmed_classes:
             result.true_negatives += 1
@@ -118,6 +137,18 @@ def evaluate_reports(
         result.total_time_s += report.slicing_time_s + report.llm_time_s + report.verification_time_s
     result.n_contracts = len(reports)
     return result
+
+
+def verification_coverage(reports: list[ScanReport]) -> dict:
+    """Share of LLM findings that symbolic verification could actually check."""
+    verified = sum(
+        1 for r in reports for vf in r.findings if vf.verdict in (Verdict.CONFIRMED, Verdict.REFUTED)
+    )
+    skipped = sum(1 for r in reports for vf in r.findings if vf.verdict == Verdict.REFUTED)
+    skipped += sum(1 for r in reports for vf in r.findings if vf.verdict == Verdict.SKIPPED)
+    total = verified + skipped
+    return {"verified": verified, "skipped": skipped, "total": total,
+            "coverage": round(verified / total, 4) if total else 1.0}
 
 
 _LABEL_ALIASES = {
@@ -135,6 +166,13 @@ _LABEL_ALIASES = {
     "unprotected_upgradeable": {"access-control"},
     "business-logic": None,  # matches any finding class (case-study mode)
     "business_logic": None,
+    "arithmetic": {"unchecked-arithmetic"},
+    "unchecked_low_level_calls": {"unchecked-low-level-call"},
+    "front_running": {"front-running"},
+    "time_manipulation": {"front-running", "oracle-manipulation"},
+    "denial_of_service": {"denial-of-service", "other"},
+    "bad_randomness": {"bad-randomness", "other"},
+    "short_addresses": {"other"},
 }
 
 
@@ -198,7 +236,8 @@ def comparison_bar_chart(tool_results: list[ToolResult], out_path: str | Path) -
     ax.set_title("Vulnerability detection: Precision / Recall / F1")
     ax.legend(frameon=False, fontsize=8)
     ax.spines[["top", "right"]].set_visible(False)
-    fig.tight_layout()
+    with contextlib.suppress(Exception):
+        fig.tight_layout()
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight")
@@ -217,7 +256,8 @@ def fp_reduction_chart(reports: list[ScanReport], out_path: str | Path) -> Path:
     ax.set_ylabel("findings")
     ax.set_title(f"False positives removed: {removed} ({false_positive_reduction(reports)['reduction_rate']}%)")
     ax.spines[["top", "right"]].set_visible(False)
-    fig.tight_layout()
+    with contextlib.suppress(Exception):
+        fig.tight_layout()
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight")
@@ -238,7 +278,8 @@ def efficiency_chart(reports_sliced: list[ScanReport], reports_full: list[ScanRe
     ax.set_ylabel("avg tokens / contract")
     ax.set_title("Token efficiency of program slicing")
     ax.spines[["top", "right"]].set_visible(False)
-    fig.tight_layout()
+    with contextlib.suppress(Exception):
+        fig.tight_layout()
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight")

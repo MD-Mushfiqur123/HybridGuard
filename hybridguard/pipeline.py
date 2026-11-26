@@ -81,6 +81,7 @@ class HybridGuardPipeline:
         report.n_findings = len(findings)
         for finding in findings:
             finding.params = _param_types_for(analysis, finding)
+            finding.ctor_params = _ctor_types_for(analysis, finding)
 
         verifier = self.verifier
         for finding in findings:
@@ -156,4 +157,12 @@ def _param_types_for(analysis: ContractAnalysis, finding) -> list[str]:
     for s in analysis.slices:
         if s.function == finding.function or s.function == f"{finding.function}({','.join(finding.params)})":
             return list(s.param_types)
+    return []
+
+
+def _ctor_types_for(analysis: ContractAnalysis, finding) -> list[str]:
+    if finding.contract in analysis.constructor_params:
+        return list(analysis.constructor_params[finding.contract])
+    if len(analysis.constructor_params) == 1:
+        return next(iter(analysis.constructor_params.values()))
     return []

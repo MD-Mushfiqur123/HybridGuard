@@ -16,6 +16,8 @@ VALID_CLASSES = {
     "unchecked-arithmetic",
     "oracle-manipulation",
     "front-running",
+    "denial-of-service",
+    "bad-randomness",
     "unchecked-low-level-call",
     "delegatecall-to-untrusted",
     "other",
