@@ -1,0 +1,25 @@
+{
+  "slicing": {
+    "max_slices": 8,
+    "min_criticality": 3.0,
+    "include_ir": true,
+    "include_source": true,
+    "max_source_lines": 120
+  },
+  "llm": {
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "temperature": 0.1,
+    "max_tokens": 2048,
+    "base_url": "",
+    "api_key_env": "GROQ_API_KEY",
+    "seed": 42
+  },
+  "verification": {
+    "backend": "foundry",
+    "fuzz_runs": 256,
+    "timeout_s": 120,
+    "workdir": ".hybridguard/verify"
+  },
+  "output_dir": ".hybridguard/results"
+}
