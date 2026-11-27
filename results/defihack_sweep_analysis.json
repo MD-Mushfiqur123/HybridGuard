@@ -1,0 +1,84 @@
+{
+  "sweep": ".hybridguard/results/defihack_slither_sweep.jsonl",
+  "n_records": 953,
+  "statuses": {
+    "ok": 178,
+    "compile-error": 762,
+    "timeout": 13
+  },
+  "compilable_share": 0.187,
+  "labeled_compilable": 98,
+  "any_check_fired_on_labeled": 98,
+  "per_label": {
+    "flash-loan": {
+      "labeled_compilable": 65,
+      "detected": 0,
+      "any_check_fired": 65,
+      "detection_rate": 0.0,
+      "any_check_rate": 1.0
+    },
+    "precision-loss": {
+      "labeled_compilable": 14,
+      "detected": 3,
+      "any_check_fired": 14,
+      "detection_rate": 0.214,
+      "any_check_rate": 1.0
+    },
+    "unchecked-arithmetic": {
+      "labeled_compilable": 13,
+      "detected": 0,
+      "any_check_fired": 13,
+      "detection_rate": 0.0,
+      "any_check_rate": 1.0
+    },
+    "governance": {
+      "labeled_compilable": 12,
+      "detected": 0,
+      "any_check_fired": 12,
+      "detection_rate": 0.0,
+      "any_check_rate": 1.0
+    },
+    "oracle-manipulation": {
+      "labeled_compilable": 11,
+      "detected": 0,
+      "any_check_fired": 11,
+      "detection_rate": 0.0,
+      "any_check_rate": 1.0
+    },
+    "delegatecall-to-untrusted": {
+      "labeled_compilable": 11,
+      "detected": 0,
+      "any_check_fired": 11,
+      "detection_rate": 0.0,
+      "any_check_rate": 1.0
+    },
+    "access-control": {
+      "labeled_compilable": 10,
+      "detected": 0,
+      "any_check_fired": 10,
+      "detection_rate": 0.0,
+      "any_check_rate": 1.0
+    },
+    "reentrancy": {
+      "labeled_compilable": 5,
+      "detected": 4,
+      "any_check_fired": 5,
+      "detection_rate": 0.8,
+      "any_check_rate": 1.0
+    },
+    "front-running": {
+      "labeled_compilable": 3,
+      "detected": 0,
+      "any_check_fired": 3,
+      "detection_rate": 0.0,
+      "any_check_rate": 1.0
+    },
+    "bad-randomness": {
+      "labeled_compilable": 1,
+      "detected": 1,
+      "any_check_fired": 1,
+      "detection_rate": 1.0,
+      "any_check_rate": 1.0
+    }
+  }
+}

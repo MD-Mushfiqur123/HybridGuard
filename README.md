@@ -65,6 +65,11 @@ the Groq free tier (`HYBRIDGUARD_API_KEY`):
   classes pattern tools cannot express.
 - **Class-wise breakdown** (`results/sb_groq_detection_class_breakdown.json`): reentrancy 21/30
   contracts hit with 0 FP, but arithmetic/access-control/randomness classes are near-blind spots.
+- **DeFiHackLabs full sweep (953 incidents)**: only 18.7% compile standalone; on the 98 compilable
+  explicitly-labeled incidents Slither detects the labeled class in **0/65 flash-loan, 0/11 oracle,
+  0/12 governance, 0/10 access-control, 0/13 arithmetic** — vs 4/5 reentrancy
+  (`results/defihack_sweep_analysis.json`). Pattern tools are blind exactly on business-logic
+  classes where real losses concentrate.
 - **Clean-code 0 FP applies to the 47 slice-bearing contracts** the LLM actually reasoned about
   (53/100 are interfaces/libraries that by design reach no LLM call).
 - All runs are single runs (no variance estimates); DeFiHackLabs numbers are exploratory (1 labeled
