@@ -16,6 +16,20 @@ dev = ["pytest>=7"]
 [project.scripts]
 hybridguard = "hybridguard.cli:main"
 
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = [
+    "hybridguard",
+    "hybridguard.datasets",
+    "hybridguard.evaluation",
+    "hybridguard.llm",
+    "hybridguard.slicing",
+    "hybridguard.verification",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
