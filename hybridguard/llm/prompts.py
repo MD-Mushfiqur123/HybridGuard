@@ -13,6 +13,9 @@ from __future__ import annotations
 from hybridguard.models import FunctionSlice
 from hybridguard.slicing.slicer import render_slice_context
 
+MAX_SLICE_CHARS = 6000
+MAX_PROMPT_CHARS = 12000
+
 SYSTEM_PROMPT = """You are HybridGuard's reasoning engine: an expert smart-contract security auditor.
 You receive ONE OR MORE PROGRAM SLICES extracted by static analysis from a Solidity
 contract, together with facts from its control-flow graph (CFG) and SLITHIR
@@ -106,14 +109,20 @@ def build_user_prompt(slices: list[FunctionSlice], contract_path: str, include_i
     ]
     blocks = []
     for i, s in enumerate(slices, 1):
-        blocks.append(f"=== SLICE {i} ===\n{render_slice_context(s, include_ir=include_ir)}")
+        block = f"=== SLICE {i} ===\n{render_slice_context(s, include_ir=include_ir)}"
+        if len(block) > MAX_SLICE_CHARS:
+            block = block[:MAX_SLICE_CHARS] + "\n... (slice context truncated)"
+        blocks.append(block)
     question = (
         "AUDIT QUESTION: For each slice, is there a concrete attacker-executable "
         "transaction sequence (possibly re-entering from an attacker-controlled contract) "
         "that manipulates state or steals funds in a way the developer did not intend? "
         "Follow the system reasoning steps, then output the strict JSON verdict."
     )
-    return "\n".join(header + blocks + ["", question])
+    prompt = "\n".join(header + blocks + ["", question])
+    if len(prompt) > MAX_PROMPT_CHARS:
+        prompt = prompt[:MAX_PROMPT_CHARS] + "\n... (prompt truncated)"
+    return prompt
 
 
 def build_messages(slices: list[FunctionSlice], contract_path: str, few_shot: bool = True, include_ir: bool = True) -> list[dict]:
