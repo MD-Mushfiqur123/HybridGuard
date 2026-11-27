@@ -48,9 +48,6 @@ def run_slither(path: Path, timeout: int) -> dict:
 
 def run_mythril(path: Path, timeout: int) -> dict:
     cmd = ["myth", "analyze", str(path), "-o", "json", "--execution-timeout", str(timeout)]
-    remaps = _auto_remaps(str(path))
-    if remaps:
-        cmd += ["--solc-remaps", " ".join(remaps)]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 90)
     except subprocess.TimeoutExpired:
