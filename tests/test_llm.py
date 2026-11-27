@@ -57,3 +57,26 @@ def test_mock_llm_flags_value_call_only():
     )
     data = json.loads(content)
     assert data["findings"][0]["vuln_class"] == "reentrancy-eth"
+
+
+def test_multipass_reasoning_merges_and_dedupes():
+    from hybridguard.config import LLMConfig
+    from hybridguard.llm.reasoner import REASONING_BUNDLES, LLMReasoner
+    from hybridguard.models import FunctionSlice
+
+    cfg = LLMConfig()
+    cfg.multipass = True
+    reasoner = LLMReasoner(cfg)
+    slice_ = FunctionSlice(
+        contract="C",
+        function="withdraw",
+        visibility="external",
+        criticality=0.9,
+        reasons=["external call with value"],
+        state_writes=["balances"],
+    )
+    findings, usage, elapsed = reasoner.analyze_slices([slice_], "test.sol")
+    assert len(REASONING_BUNDLES) == 3
+    assert usage.prompt_tokens > 0
+    keys = {(f.contract, f.function, f.vuln_class, f.sink) for f in findings}
+    assert len(keys) == len(findings)

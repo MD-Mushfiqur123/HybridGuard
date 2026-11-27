@@ -27,6 +27,7 @@ class LLMConfig:
     base_url: str = ""                  # override for custom OpenAI-compatible endpoints
     api_key_env: str = "HYBRIDGUARD_API_KEY"
     seed: int | None = 42
+    multipass: bool = False             # one reasoning pass per category bundle
 
 
 @dataclass

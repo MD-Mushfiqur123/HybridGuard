@@ -39,12 +39,14 @@ def main() -> int:
     ap.add_argument("--verification", default="foundry")
     ap.add_argument("--no-slicing", action="store_true")
     ap.add_argument("--mode", default="strict", choices=["strict", "detection"])
+    ap.add_argument("--multipass", action="store_true", help="one LLM pass per category bundle")
     ap.add_argument("--out", default=".hybridguard/results")
     args = ap.parse_args()
 
     cfg = Config()
     cfg.llm.provider = args.provider
     cfg.llm.model = args.model
+    cfg.llm.multipass = args.multipass
     cfg.verification.backend = args.verification
     cfg.verification.workdir = ".hybridguard/verify"
     cfg.output_dir = args.out
