@@ -52,6 +52,7 @@ Runs with real LLM backends on the Groq free tier (`HYBRIDGUARD_API_KEY`):
 | Reentrancy + Mythril | `openai/gpt-oss-120b` | SmartBugs reentrancy (31) | **1.00** | 0.45 | **0.62** | **0** | Mythril (100% coverage) |
 | Detection (sliced) | `openai/gpt-oss-20b` | SmartBugs curated (143) | **0.67** | 0.18 | 0.29 | 13 | none |
 | Clean baseline (FP-rate) | `qwen/qwen3.8-27b` | OpenZeppelin (100) | — | — | — | **0** (TN=100) | none |
+| Real-incident (exploratory) | `qwen/qwen3.8-27b` | DeFiHackLabs (30) | — | — | — | 3 raw (incl. BEC batchOverflow) | — |
 
 - **Zero hallucinations on clean code**: with static slicing, the real LLM reports **0 findings across
   100 clean OpenZeppelin contracts** — the core HybridGuard claim (slices + strict JSON + attack-path
