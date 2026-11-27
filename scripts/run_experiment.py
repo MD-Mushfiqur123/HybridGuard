@@ -58,7 +58,15 @@ def main() -> int:
     t0 = time.time()
     for i, c in enumerate(contracts, 1):
         t = time.time()
-        r = pipeline.scan(c.path)
+        try:
+            r = pipeline.scan(c.path)
+        except Exception as exc:
+            print(f"  [{i}/{len(contracts)}] {c.stem} CRASH {type(exc).__name__}: {str(exc)[:80]} ({time.time() - t:.1f}s)", flush=True)
+            from hybridguard.models import ScanReport
+
+            r = ScanReport(path=str(c.path), errors=[f"{type(exc).__name__}: {exc}"])
+            reports.append(r)
+            continue
         status = "ERR" if r.errors else f"slices={r.n_slices} findings={r.n_findings} filtered={len(r.filtered_out)}"
         print(f"  [{i}/{len(contracts)}] {c.stem} {status} ({time.time() - t:.1f}s)", flush=True)
         reports.append(r)

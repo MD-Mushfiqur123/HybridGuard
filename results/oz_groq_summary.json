@@ -1,0 +1,40 @@
+{
+  "experiment": "oz_groq",
+  "dataset": "datasets/openzeppelin-contracts/contracts",
+  "n_contracts": 100,
+  "provider": "groq",
+  "slicing": true,
+  "verification": "none",
+  "mode": "strict",
+  "wall_time_s": 1135.4,
+  "metrics": {
+    "tool": "HybridGuard(oz_groq)",
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "tn": 100,
+    "tokens": 138181,
+    "time_s": 1006.45
+  },
+  "false_positive_reduction": {
+    "raw_findings": 0,
+    "kept": 0,
+    "reduction_rate": 0.0
+  },
+  "token_efficiency": {
+    "avg_prompt_tokens": 1369.5,
+    "avg_total_tokens": 1381.8,
+    "avg_llm_time_s": 10.064,
+    "avg_slicing_time_s": 0.0,
+    "avg_verification_time_s": 0.0
+  },
+  "verification_coverage": {
+    "verified": 0,
+    "skipped": 0,
+    "total": 0,
+    "coverage": 1.0
+  }
+}

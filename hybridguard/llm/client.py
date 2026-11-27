@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from typing import Protocol
 
 import requests
@@ -53,15 +54,24 @@ class OpenAICompatClient:
         }
         if self.seed is not None:
             payload["seed"] = self.seed
+        if "gpt-oss" in payload["model"]:
+            payload["reasoning_effort"] = "low"
+            payload["reasoning_format"] = "hidden"
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        resp = requests.post(
-            f"{self.base_url}/chat/completions",
-            json=payload,
-            headers=headers,
-            timeout=self.timeout,
-        )
+        resp = None
+        for attempt in range(5):
+            resp = requests.post(
+                f"{self.base_url}/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=self.timeout,
+            )
+            if resp.status_code != 429:
+                break
+            wait = min(90.0, float(resp.headers.get("retry-after") or min(60.0, 5.0 * (2**attempt))))
+            time.sleep(wait)
         resp.raise_for_status()
         data = resp.json()
         content = data["choices"][0]["message"]["content"]
