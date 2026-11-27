@@ -1,0 +1,40 @@
+{
+  "experiment": "defihack_sample",
+  "dataset": "datasets/DeFiHackLabs",
+  "n_contracts": 30,
+  "provider": "mock",
+  "slicing": true,
+  "verification": "foundry",
+  "mode": "strict",
+  "wall_time_s": 244.0,
+  "metrics": {
+    "tool": "HybridGuard(defihack_sample)",
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "tp": 0,
+    "fp": 7,
+    "fn": 1,
+    "tn": 29,
+    "tokens": 67640,
+    "time_s": 6.36
+  },
+  "false_positive_reduction": {
+    "raw_findings": 9,
+    "kept": 7,
+    "reduction_rate": 22.22
+  },
+  "token_efficiency": {
+    "avg_prompt_tokens": 2226.9,
+    "avg_total_tokens": 2254.7,
+    "avg_llm_time_s": 0.0,
+    "avg_slicing_time_s": 0.0,
+    "avg_verification_time_s": 0.212
+  },
+  "verification_coverage": {
+    "verified": 0,
+    "skipped": 7,
+    "total": 7,
+    "coverage": 0.0
+  }
+}

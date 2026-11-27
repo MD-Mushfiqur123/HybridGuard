@@ -1,0 +1,40 @@
+{
+  "experiment": "smartbugs_ablation",
+  "dataset": "datasets/smartbugs-curated",
+  "n_contracts": 143,
+  "provider": "mock",
+  "slicing": false,
+  "verification": "none",
+  "mode": "detection",
+  "wall_time_s": 47.9,
+  "metrics": {
+    "tool": "HybridGuard(smartbugs_ablation)",
+    "precision": 0.1606,
+    "recall": 0.1538,
+    "f1": 0.1571,
+    "tp": 22,
+    "fp": 115,
+    "fn": 121,
+    "tn": 0,
+    "tokens": 290796,
+    "time_s": 0.01
+  },
+  "false_positive_reduction": {
+    "raw_findings": 137,
+    "kept": 137,
+    "reduction_rate": 0.0
+  },
+  "token_efficiency": {
+    "avg_prompt_tokens": 1949.7,
+    "avg_total_tokens": 2033.5,
+    "avg_llm_time_s": 0.0,
+    "avg_slicing_time_s": 0.0,
+    "avg_verification_time_s": 0.0
+  },
+  "verification_coverage": {
+    "verified": 0,
+    "skipped": 137,
+    "total": 137,
+    "coverage": 0.0
+  }
+}
