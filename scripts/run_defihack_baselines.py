@@ -20,7 +20,7 @@ import sys
 import time
 from pathlib import Path
 
-from hybridguard.slicing.slicer import _required_pragma_version, _resolve_solc_binary
+from hybridguard.slicing.slicer import _auto_remaps, _required_pragma_version, _resolve_solc_binary
 
 
 def run_slither(path: Path, timeout: int) -> dict:
@@ -29,6 +29,9 @@ def run_slither(path: Path, timeout: int) -> dict:
     cmd = ["slither", str(path), "--json", "-"]
     if binary:
         cmd += ["--solc", binary]
+    remaps = _auto_remaps(str(path))
+    if remaps:
+        cmd += ["--solc-remaps", *remaps]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -45,6 +48,9 @@ def run_slither(path: Path, timeout: int) -> dict:
 
 def run_mythril(path: Path, timeout: int) -> dict:
     cmd = ["myth", "analyze", str(path), "-o", "json", "--execution-timeout", str(timeout)]
+    remaps = _auto_remaps(str(path))
+    if remaps:
+        cmd += ["--solc-remaps", " ".join(remaps)]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 90)
     except subprocess.TimeoutExpired:
@@ -54,6 +60,8 @@ def run_mythril(path: Path, timeout: int) -> dict:
     try:
         data = json.loads(proc.stdout)
     except json.JSONDecodeError:
+        return {"status": "compile-error"}
+    if not data.get("success", True):
         return {"status": "compile-error"}
     swcs = sorted({str(i.get("swc-id", i.get("swcID", "?"))) for i in data.get("issues", [])})
     return {"status": "ok", "swc_ids": swcs}
@@ -80,19 +88,29 @@ def main() -> int:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     runner = run_slither if args.tool == "slither" else run_mythril
-    print(f"{args.tool} sweep: {len(files)} incidents", flush=True)
 
-    statuses: dict[str, int] = {}
-    with out.open("w") as fh:
-        for i, path in enumerate(files, 1):
+    done: set[str] = set()
+    if out.exists():
+        for line in out.read_text().splitlines():
+            try:
+                done.add(json.loads(line)["path"])
+            except (json.JSONDecodeError, KeyError):
+                continue
+    todo = [p for p in files if str(p) not in done]
+    print(f"{args.tool} sweep: {len(files)} incidents ({len(done)} already done, {len(todo)} to go)", flush=True)
+
+    statuses: dict[str, int] = {"done-skipped": len(done)}
+    with out.open("a") as fh:
+        for i, path in enumerate(todo, 1):
             t = time.time()
             result = runner(path, args.timeout)
             result["path"] = str(path)
             result["time_s"] = round(time.time() - t, 1)
             statuses[result["status"]] = statuses.get(result["status"], 0) + 1
             fh.write(json.dumps(result) + "\n")
-            if i % 25 == 0 or i == len(files):
-                print(f"  [{i}/{len(files)}] {statuses}", flush=True)
+            fh.flush()
+            if i % 25 == 0 or i == len(todo):
+                print(f"  [{i}/{len(todo)}] {statuses}", flush=True)
 
     print(json.dumps(statuses, indent=2), flush=True)
     return 0
