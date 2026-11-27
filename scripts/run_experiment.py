@@ -16,9 +16,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from hybridguard.datasets.loader import load_contracts
-
 from hybridguard.config import Config
+from hybridguard.datasets.loader import load_contracts
 from hybridguard.evaluation.metrics import (
     comparison_bar_chart,
     evaluate_reports,
