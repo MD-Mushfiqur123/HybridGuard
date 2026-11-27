@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import sys
 import time
 from pathlib import Path
@@ -40,6 +41,7 @@ def main() -> int:
     ap.add_argument("--no-slicing", action="store_true")
     ap.add_argument("--mode", default="strict", choices=["strict", "detection"])
     ap.add_argument("--multipass", action="store_true", help="one LLM pass per category bundle")
+    ap.add_argument("--timeout", type=int, default=300, help="per-contract watchdog (seconds)")
     ap.add_argument("--out", default=".hybridguard/results")
     args = ap.parse_args()
 
@@ -61,7 +63,15 @@ def main() -> int:
     for i, c in enumerate(contracts, 1):
         t = time.time()
         try:
-            r = pipeline.scan(c.path)
+            def _on_timeout(signum, frame):
+                raise TimeoutError(f"contract processing exceeded {args.timeout}s")
+
+            signal.signal(signal.SIGALRM, _on_timeout)
+            signal.alarm(args.timeout)
+            try:
+                r = pipeline.scan(c.path)
+            finally:
+                signal.alarm(0)
         except Exception as exc:
             print(f"  [{i}/{len(contracts)}] {c.stem} CRASH {type(exc).__name__}: {str(exc)[:80]} ({time.time() - t:.1f}s)", flush=True)
             from hybridguard.models import ScanReport

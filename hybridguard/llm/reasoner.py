@@ -107,7 +107,9 @@ class LLMReasoner:
         findings: list[LLMFinding] = []
         usage = TokenUsage()
         started = time.time()
-        for bundle in REASONING_BUNDLES:
+        for i, bundle in enumerate(REASONING_BUNDLES):
+            if i and self.config.multipass_gap_s:
+                time.sleep(self.config.multipass_gap_s)
             messages = build_bundle_messages(
                 slices, contract_path, bundle, few_shot=True, include_ir=include_ir
             )

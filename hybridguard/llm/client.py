@@ -61,7 +61,7 @@ class OpenAICompatClient:
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         resp = None
-        for attempt in range(5):
+        for attempt in range(8):
             resp = requests.post(
                 f"{self.base_url}/chat/completions",
                 json=payload,

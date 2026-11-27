@@ -28,6 +28,7 @@ class LLMConfig:
     api_key_env: str = "HYBRIDGUARD_API_KEY"
     seed: int | None = 42
     multipass: bool = False             # one reasoning pass per category bundle
+    multipass_gap_s: int = 25           # inter-pass gap to stay under free-tier TPM
 
 
 @dataclass
