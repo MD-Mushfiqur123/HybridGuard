@@ -326,10 +326,12 @@ heuristic's 12 raw findings on the same corpus (1 refuted by Foundry) as evidenc
 remains necessary for weaker reasoners.
 
 \section{Threats to Validity and Limitations}
-\textbf{Single runs, no variance.} Every configuration was executed once. LLM outputs are
-non-deterministic even at temperature $0.2$; metrics on small subsets (e.g., 23 raw findings) carry
-run-to-run variance we do not quantify. Repeated runs with mean $\pm$ std are required before the
-reported gaps should be treated as precise.
+\textbf{Single runs, no variance.} Every configuration was executed once, with one exception: the
+reentrancy single-pass configuration was repeated end-to-end on an independent API key and time
+window and reproduced the outcome exactly (TP $=14$, FP $=0$, F1 $=0.62$ across 31 contracts),
+suggesting low run-to-run variance for this configuration at temperature $0.2$. Still, LLM outputs
+are non-deterministic and metrics on small subsets carry unquantified variance; repeated runs with
+mean $\pm$ std are required before the reported gaps should be treated as precise.
 
 \textbf{Partial contract coverage under rate limits.} The DeFiHackLabs run completed analysis for
 16 of 30 contracts (14 lost to compile failures of historical exploit scaffolding and free-tier 429

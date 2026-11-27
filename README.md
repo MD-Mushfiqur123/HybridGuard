@@ -53,6 +53,7 @@ the Groq free tier (`HYBRIDGUARD_API_KEY`):
 | Slither-only | Slither detectors | SmartBugs reentrancy (31) | 1.00 | **0.74** | **0.85** | 0 |
 | Mythril-only | Mythril symbolic exec. | SmartBugs reentrancy (31) | see results JSON | | | |
 | Reentrancy + Mythril | `gpt-oss-120b` | SmartBugs reentrancy (31) | **1.00** | 0.45 | 0.62 | **0** |
+| Reentrancy + Mythril (replication) | `gpt-oss-120b` | SmartBugs reentrancy (31) | **1.00** | 0.45 | 0.62 | **0** |
 | Detection (sliced) | `gpt-oss-20b` | SmartBugs curated (143) | **0.67** | 0.18 | 0.29 | 13 |
 | Clean baseline | `qwen3.8-27b` | OpenZeppelin (100, 47 sliced) | — | — | — | **0** |
 | Real-incident (exploratory) | `qwen3.8-27b` | DeFiHackLabs (30, 16 ran) | — | — | — | 3 raw |
@@ -67,7 +68,9 @@ the Groq free tier (`HYBRIDGUARD_API_KEY`):
 - **Clean-code 0 FP applies to the 47 slice-bearing contracts** the LLM actually reasoned about
   (53/100 are interfaces/libraries that by design reach no LLM call).
 - All runs are single runs (no variance estimates); DeFiHackLabs numbers are exploratory (1 labeled
-  contract, PoC comments may contaminate findings).
+  contract, PoC comments may contaminate findings). The reentrancy single-pass configuration was
+  repeated on an independent API key and reproduced exactly (TP=14, FP=0, F1=0.62) — the one
+  replicated configuration so far.
 - Raw summaries: `results/*_groq_*.json`, class breakdown: `results/sb_groq_detection_class_breakdown.json`.
 
 ## Layout
