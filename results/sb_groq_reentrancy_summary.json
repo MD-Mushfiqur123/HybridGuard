@@ -1,0 +1,40 @@
+{
+  "experiment": "sb_groq_reentrancy",
+  "dataset": "datasets/smartbugs-curated/dataset/reentrancy",
+  "n_contracts": 31,
+  "provider": "groq",
+  "slicing": true,
+  "verification": "mythril",
+  "mode": "strict",
+  "wall_time_s": 1503.7,
+  "metrics": {
+    "tool": "HybridGuard(sb_groq_reentrancy)",
+    "precision": 1.0,
+    "recall": 0.4516,
+    "f1": 0.6222,
+    "tp": 14,
+    "fp": 0,
+    "fn": 17,
+    "tn": 0,
+    "tokens": 71050,
+    "time_s": 1497.0
+  },
+  "false_positive_reduction": {
+    "raw_findings": 23,
+    "kept": 14,
+    "reduction_rate": 39.13
+  },
+  "token_efficiency": {
+    "avg_prompt_tokens": 1593.7,
+    "avg_total_tokens": 2291.9,
+    "avg_llm_time_s": 1.757,
+    "avg_slicing_time_s": 0.0,
+    "avg_verification_time_s": 46.533
+  },
+  "verification_coverage": {
+    "verified": 14,
+    "skipped": 0,
+    "total": 14,
+    "coverage": 1.0
+  }
+}

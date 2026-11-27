@@ -1,0 +1,40 @@
+{
+  "experiment": "sb_groq_detection",
+  "dataset": "datasets/smartbugs-curated",
+  "n_contracts": 143,
+  "provider": "groq",
+  "slicing": true,
+  "verification": "none",
+  "mode": "detection",
+  "wall_time_s": 1066.0,
+  "metrics": {
+    "tool": "HybridGuard(sb_groq_detection)",
+    "precision": 0.6667,
+    "recall": 0.1818,
+    "f1": 0.2857,
+    "tp": 26,
+    "fp": 13,
+    "fn": 117,
+    "tn": 0,
+    "tokens": 188810,
+    "time_s": 1016.25
+  },
+  "false_positive_reduction": {
+    "raw_findings": 39,
+    "kept": 39,
+    "reduction_rate": 0.0
+  },
+  "token_efficiency": {
+    "avg_prompt_tokens": 1192.3,
+    "avg_total_tokens": 1320.3,
+    "avg_llm_time_s": 7.107,
+    "avg_slicing_time_s": 0.0,
+    "avg_verification_time_s": 0.0
+  },
+  "verification_coverage": {
+    "verified": 0,
+    "skipped": 39,
+    "total": 39,
+    "coverage": 0.0
+  }
+}

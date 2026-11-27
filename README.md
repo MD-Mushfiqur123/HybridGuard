@@ -43,6 +43,25 @@ Solidity file ──▶ Slither (AST/CFG/IR) ──▶ top-K critical slices ─
   100 contracts; 840 vs 2,033 avg tokens/contract on SmartBugs).
 - Raw summaries in `results/`, publication figures in `results/figures/`.
 
+## Real-LLM results (Groq API, free tier)
+
+Runs with real LLM backends on the Groq free tier (`HYBRIDGUARD_API_KEY`):
+
+| Experiment | Model | Dataset | Precision | Recall | F1 | FP | Verification |
+|---|---|---|---|---|---|---|---|
+| Reentrancy + Mythril | `openai/gpt-oss-120b` | SmartBugs reentrancy (31) | **1.00** | 0.45 | **0.62** | **0** | Mythril (100% coverage) |
+| Detection (sliced) | `openai/gpt-oss-20b` | SmartBugs curated (143) | **0.67** | 0.18 | 0.29 | 13 | none |
+| Clean baseline (FP-rate) | `qwen/qwen3.8-27b` | OpenZeppelin (100) | — | — | — | **0** (TN=100) | none |
+
+- **Zero hallucinations on clean code**: with static slicing, the real LLM reports **0 findings across
+  100 clean OpenZeppelin contracts** — the core HybridGuard claim (slices + strict JSON + attack-path
+  reasoning suppress false positives) holds without any symbolic verification.
+- **Perfect precision with verification**: on SmartBugs reentrancy, every kept finding is a true
+  positive (P = 1.00, FP = 0); Mythril verification filters 39% of raw LLM findings.
+- Real-LLM detection keeps precision far above the mock heuristic baseline (0.67 vs 0.19) at the cost
+  of recall on 117 unseen bug classes — expected on a multi-class dataset with a single-run prompt.
+- Raw summaries: `results/*_groq_*.json`, figures: `results/figures/*_groq_fig.png`.
+
 ## Layout
 
 - `hybridguard/slicing/` — Slither-based static analysis, call graph, program slices

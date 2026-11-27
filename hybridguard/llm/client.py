@@ -70,7 +70,7 @@ class OpenAICompatClient:
             )
             if resp.status_code != 429:
                 break
-            wait = float(resp.headers.get("retry-after") or min(60.0, 5.0 * (2**attempt)))
+            wait = min(90.0, float(resp.headers.get("retry-after") or min(60.0, 5.0 * (2**attempt))))
             time.sleep(wait)
         resp.raise_for_status()
         data = resp.json()
