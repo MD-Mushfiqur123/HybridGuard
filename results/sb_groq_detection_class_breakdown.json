@@ -1,0 +1,74 @@
+{
+  "experiment": "sb_groq_detection_class_breakdown",
+  "model": "openai/gpt-oss-20b",
+  "mode": "detection",
+  "per_class": {
+    "unchecked_low_level_calls": {
+      "n_contracts": 52,
+      "contracts_hit": 2,
+      "tp": 2,
+      "fp": 7
+    },
+    "reentrancy": {
+      "n_contracts": 30,
+      "contracts_hit": 21,
+      "tp": 21,
+      "fp": 0
+    },
+    "access_control": {
+      "n_contracts": 18,
+      "contracts_hit": 1,
+      "tp": 1,
+      "fp": 4
+    },
+    "arithmetic": {
+      "n_contracts": 15,
+      "contracts_hit": 0,
+      "tp": 0,
+      "fp": 0
+    },
+    "bad_randomness": {
+      "n_contracts": 8,
+      "contracts_hit": 0,
+      "tp": 0,
+      "fp": 0
+    },
+    "denial_of_service": {
+      "n_contracts": 6,
+      "contracts_hit": 0,
+      "tp": 0,
+      "fp": 0
+    },
+    "time_manipulation": {
+      "n_contracts": 5,
+      "contracts_hit": 0,
+      "tp": 0,
+      "fp": 0
+    },
+    "front_running": {
+      "n_contracts": 4,
+      "contracts_hit": 0,
+      "tp": 0,
+      "fp": 1
+    },
+    "other": {
+      "n_contracts": 3,
+      "contracts_hit": 1,
+      "tp": 1,
+      "fp": 0
+    },
+    "short_addresses": {
+      "n_contracts": 1,
+      "contracts_hit": 1,
+      "tp": 1,
+      "fp": 1
+    }
+  },
+  "oz_groq_effective_n": {
+    "n_contracts": 100,
+    "contracts_with_slices": 47,
+    "contracts_without_slices": 53,
+    "findings_on_reasoned_contracts": 0,
+    "false_positives": 0
+  }
+}

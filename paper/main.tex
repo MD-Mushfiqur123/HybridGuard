@@ -41,12 +41,16 @@ privileged calls); (3) context-aware reasoning over \emph{only} those slices wit
 prompting and a strict-JSON attack-path output contract; and (4) symbolic verification of every
 candidate finding with Mythril (or Foundry exploit-harness fuzzing). On the SmartBugs Curated
 reentrancy benchmark, \system{} with \texttt{gpt-oss-120b} achieves precision $1.00$ (F1 $0.62$)
-with \textbf{zero} false positives after symbolic verification filters 39\% of raw LLM findings. On
-100 clean OpenZeppelin contracts, slicing-constrained LLM reasoning reports \textbf{zero}
-hallucinated findings. Slicing also halves prompt tokens ($1{,}950 \rightarrow 840$ tokens per
-contract), making the pipeline practical on free-tier LLM APIs and commodity laptops. These results
-support our hypothesis that grounding LLM reasoning in static program facts, and closing the loop
-with symbolic execution, mitigates the hallucination problem that limits pure-LLM auditing.
+with \textbf{zero} false positives after symbolic verification filters 39\% of raw LLM findings.
+On the slice-bearing subset (47/100) of 100 clean OpenZeppelin contracts, slicing-constrained LLM
+reasoning reports \textbf{zero} hallucinated findings. Slicing also halves prompt tokens
+($1{,}950 \rightarrow 840$ tokens per contract), making the pipeline practical on free-tier LLM
+APIs and commodity laptops. We report honest comparisons against \emph{tool-only baselines}: on the
+single-class reentrancy subset, Slither alone is stronger (F1 $0.85$); \system{}'s value is
+complementary---verified, low-FP reasoning over static facts and a path toward business-logic
+classes that pattern detectors cannot express---while its cross-class recall ($0.18$) remains an
+open problem. All results are single runs on free-tier infrastructure; per-class breakdowns are
+reported to make weaknesses explicit.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -77,10 +81,12 @@ reproduced or its impossibility proven.
   \item A four-stage neuro-symbolic pipeline (static slicing $\rightarrow$ context-aware LLM
         reasoning $\rightarrow$ symbolic verification $\rightarrow$ evaluation) that is fully open
         source and runs on free-tier APIs and a commodity laptop.
-  \item Evidence that slicing-constrained prompts eliminate LLM hallucinations on clean code
-        (0 findings on 100 clean OpenZeppelin contracts) while preserving detection of real bugs.
+  \item Evidence that slicing-constrained prompts suppress hallucinated findings on the
+        slice-bearing subset of 100 clean OpenZeppelin contracts (0 findings), while class-wise
+        breakdowns expose exactly where LLM reasoning fails (arithmetic, access control).
   \item Quantified FP reduction from symbolic verification (39\% of raw LLM findings filtered,
-        ending at precision $1.00$, FP $= 0$ on the reentrancy benchmark).
+        ending at precision $1.00$, FP $= 0$ on the reentrancy benchmark), and tool-only baselines
+        showing Slither alone remains stronger on single-class pattern benchmarks.
   \item A token-efficiency study showing slicing halves prompt tokens per contract
         ($1{,}950 \rightarrow 840$ avg.\ tokens), enabling free-tier experimentation.
 \end{enumerate}
@@ -186,40 +192,51 @@ reproducible CI baseline.
 \section{Results}
 
 \subsection{Main results}
-Table~\ref{tab:main} summarizes all runs.
+Table~\ref{tab:main} summarizes all runs, including tool-only baselines and the deterministic
+mock reasoner (a pipeline sanity check, \emph{not} a competitive baseline).
 
 \begin{table*}[t]
 \centering
-\caption{\system{} results across datasets and backends. ``Mock'' is the deterministic rule-based
-reasoner (pipeline-only baseline); Groq rows use real LLM backends.}
-\label{tab:main}
+\caption{Results across datasets and backends. ``Mock'' is a deterministic rule-based reasoner used
+only to validate the pipeline plumbing offline; it is not a competitive detector. Tool-only
+baselines (Slither, Mythril) were run on the same 31 reentrancy contracts with per-pragma solc
+resolution.}\label{tab:main}
 \begin{tabular}{llllrrrrrr}
 \toprule
 Experiment & Backend & Verification & Dataset & P & R & F1 & TP & FP & Raw $\rightarrow$ kept \\
 \midrule
-Reentrancy (mock)        & mock rule-based        & Mythril & SmartBugs reentrancy (31) & 1.00 & 0.45 & 0.62 & 14 & 0 & 22 $\rightarrow$ 14 \\
-Reentrancy (real LLM)    & \texttt{gpt-oss-120b}  & Mythril & SmartBugs reentrancy (31) & \textbf{1.00} & 0.45 & \textbf{0.62} & 14 & \textbf{0} & 23 $\rightarrow$ 14 \\
-Detection (mock, sliced) & mock rule-based        & ---     & SmartBugs curated (143)   & 0.19 & 0.15 & 0.17 & 22 & 93 & 115 $\rightarrow$ 115 \\
-Detection (real LLM)     & \texttt{gpt-oss-20b}   & ---     & SmartBugs curated (143)   & \textbf{0.67} & 0.18 & 0.29 & 26 & 13 & 39 $\rightarrow$ 39 \\
-Clean control (real LLM) & \texttt{qwen3.8-27b}   & ---     & OpenZeppelin (100)        & ---  & ---  & ---  & 0  & \textbf{0} & 0 $\rightarrow$ 0 \\
-Real-incident (mock)     & mock rule-based        & Foundry & DeFiHackLabs (30)         & 0.00 & 0.00 & 0.00 & 0  & 7  & 9 $\rightarrow$ 7 \\
-Real-incident (real LLM) & \texttt{qwen3.8-27b}   & ---     & DeFiHackLabs (30)         & ---  & ---  & ---  & 0  & 3  & 3 $\rightarrow$ 3 \\
+\multicolumn{10}{l}{\emph{Tool-only baselines (SmartBugs reentrancy, 31 contracts)}} \\
+Slither-only             & Slither detectors      & ---     & SmartBugs reentrancy (31) & 1.00 & \textbf{0.74} & \textbf{0.85} & 23 & 0 & --- \\
+Mythril-only             & Mythril symbolic exec. & ---     & SmartBugs reentrancy (31) & 1.00 & \textbf{0.74} & \textbf{0.85} & 23 & 0 & --- \\
+\midrule
+\multicolumn{10}{l}{\emph{\system{} (real LLM backends)}} \\
+Reentrancy + Mythril     & \texttt{gpt-oss-120b}  & Mythril & SmartBugs reentrancy (31) & \textbf{1.00} & 0.45 & 0.62 & 14 & \textbf{0} & 23 $\rightarrow$ 14 \\
+Detection (sliced)       & \texttt{gpt-oss-20b}   & ---     & SmartBugs curated (143)   & \textbf{0.67} & 0.18 & 0.29 & 26 & 13 & 39 $\rightarrow$ 39 \\
+Clean control            & \texttt{qwen3.8-27b}   & ---     & OpenZeppelin (100, 47 sliced) & ---  & ---  & ---  & 0  & \textbf{0} & 0 $\rightarrow$ 0 \\
+Real-incident (exploratory) & \texttt{qwen3.8-27b} & ---    & DeFiHackLabs (30, 16 ran) & ---  & ---  & ---  & 0  & 3  & 3 $\rightarrow$ 3 \\
+\midrule
+\multicolumn{10}{l}{\emph{\system{} (mock rule-based backend; pipeline sanity check only)}} \\
+Reentrancy (mock)        & mock heuristic         & Mythril & SmartBugs reentrancy (31) & 1.00 & 0.45 & 0.62 & 14 & 0 & 22 $\rightarrow$ 14 \\
+Detection (mock, sliced) & mock heuristic         & ---     & SmartBugs curated (143)   & 0.19 & 0.15 & 0.17 & 22 & 93 & 115 $\rightarrow$ 115 \\
+Real-incident (mock)     & mock heuristic         & Foundry & DeFiHackLabs (30)         & 0.00 & 0.00 & 0.00 & 0  & 7  & 9 $\rightarrow$ 7 \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
-\subsection{Hallucination suppression on clean code}
-On 100 clean OpenZeppelin contracts, slicing-constrained real-LLM reasoning produced
-\textbf{zero findings} (TN $= 100$), i.e., a 0\% false-positive rate with no symbolic verification
-at all. This is the central anti-hallucination result: when the model never sees irrelevant code and
-must name a concrete attack path, it declines to speculate. By contrast, the weaker mock heuristic
-baseline flags 12 spurious findings on the same corpus (1 refuted by Foundry), illustrating both the
-need for, and the effect of, the verification stage.
+\subsection{The honest headline: tool-only baselines are strong on pattern classes}
+On the single-class reentrancy subset, both tool-only baselines are strong and identical:
+Slither's reentrancy detectors and Mythril's symbolic execution each achieve F1 $0.85$
+(P $1.00$, R $0.74$, 23/31 contracts, 0 FP)---\emph{better than every \system{} configuration}
+(best F1 $0.62$). Notably, the two tools agree exactly on which contracts are vulnerable here, and
+\system{}'s Mythril verification confirms only the 14 that the LLM surfaced---a strict subset. This
+is expected and important: for a well-studied, syntactically recognizable bug class, decades-tuned
+pattern detectors win, and any paper claiming otherwise on such a subset should be viewed with
+suspicion. \system{}'s claim is therefore not dominance on pattern classes but complementarity:
+(i) every \system{} finding on this benchmark is \emph{individually verified} (Mythril confirms or
+refutes each claim) and carries an explicit attack path; (ii) on classes Slither cannot express as
+patterns (business logic), the tool-only baseline has nothing to offer, while \system{} still
+produces candidates---though Section~\ref{sec:classwise} shows current recall there is weak.
 
-On 30 real-incident contracts from DeFiHackLabs, the real-LLM configuration (exploratory,
-no verification) produced 3 raw findings, one of which targets the BEC Token exploit---the
-historical integer-overflow batch-transfer incident---indicating the constrained reasoner engages
-with genuine historical exploits without flooding clean PoC scaffolding with alerts.
 
 \subsection{Effect of symbolic verification}
 On the SmartBugs reentrancy subset with \texttt{gpt-oss-120b}, the LLM produced 23 raw findings;
@@ -227,12 +244,44 @@ Mythril symbolic verification filtered 9 (39\%), leaving 14 findings---all true 
 (precision $1.00$, FP $= 0$, 100\% verification coverage). Verification coverage matches exactly
 the number of kept findings, so no decision rests on unverified model claims.
 
+\subsection{Class-wise detection breakdown}\label{sec:classwise}
+Table~\ref{tab:classwise} decomposes the real-LLM detection run by vulnerability class. The model
+reasons well about reentrancy (21/30 contracts, 0 FP) but is near-blind to arithmetic, randomness,
+and denial-of-service classes---precisely the classes where a slice-based context omits the
+attacker-controlled value flow that a whole-file view would contain. This is a concrete,
+reproducible weakness of slicing-only context, and motivates hybrid context assembly (slice +
+controlled whole-function view) as future work.
+
+\begin{table}[t]
+\centering
+\caption{Real-LLM detection (\texttt{gpt-oss-20b}) by vulnerability class: contracts hit of
+labeled contracts, true/false positives of reported findings.}
+\label{tab:classwise}
+\begin{tabular}{lrrrr}
+\toprule
+Class & Contracts & Hit & TP & FP \\
+\midrule
+reentrancy                & 30 & \textbf{21} & 21 & 0 \\
+unchecked\_low\_level\_calls & 52 & 2  & 2  & 7 \\
+access\_control             & 18 & 1  & 1  & 4 \\
+arithmetic                  & 15 & 0  & 0  & 0 \\
+bad\_randomness              & 8  & 0  & 0  & 0 \\
+denial\_of\_service           & 6  & 0  & 0  & 0 \\
+time\_manipulation           & 5  & 0  & 0  & 0 \\
+front\_running               & 4  & 0  & 0  & 1 \\
+other / short\_addresses     & 4  & 2  & 2  & 1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{Slicing ablation: token efficiency}
 Table~\ref{tab:ablation} isolates slicing on the 143-contract SmartBugs corpus with the mock
 backend. Slicing reduces average prompt tokens per contract from 1{,}950 to 840
 ($-57\%$) and total tokens from 2{,}034 to 910 ($-55\%$) while slightly \emph{improving} precision
 (0.19 vs.\ 0.16). At free-tier token prices this roughly doubles the number of contracts auditable
-per day.
+per day. We note the prompt budget caps (6{,}000 chars/slice, 12{,}000 chars/prompt) bound the
+no-slicing configuration's cost as well, so the measured reduction is a lower bound on unconstrained
+whole-file prompting.
 
 \begin{table}[t]
 \centering
@@ -261,35 +310,55 @@ ablations). Real-LLM rows are reported in Table~\ref{tab:main}.}
 
 On the full multi-class SmartBugs corpus with \texttt{gpt-oss-20b} (detection mode, no
 verification), \system{} reaches precision $0.67$ at recall $0.18$: when the constrained model does
-report a finding it is right two times out of three---$3.5\times$ the precision of the mock
-heuristic pipeline (0.19). Recall is limited by the single-pass prompt's coverage of 117 unseen
-label classes; iterative, per-class prompting is a straightforward extension.
+report a finding it is right two times out of three. Recall is limited by the single-pass prompt's
+coverage of the 117 non-reentrancy contracts (Section~\ref{sec:classwise}); iterative, per-class
+prompting is a straightforward extension.
 
-\section{Discussion and Limitations}
-\textbf{Why precision-first matters.} An auditor triage queue lives or dies by its FP rate; our
-results show both mechanisms (slicing-constrained prompting and symbolic verification) independently
-suppress hallucinations, and they compose.
+\subsection{Hallucination suppression on clean code}
+On 100 clean OpenZeppelin contracts, the slicer selected critical slices for 47 contracts (the
+remaining 53 are interfaces/libraries with no security-critical operations and, by design, reach no
+LLM call). On the 47 contracts the model actually reasoned about, slicing-constrained real-LLM
+reasoning produced \textbf{zero findings} (0\% FP rate) with no symbolic verification. We emphasize
+the reporting caveat: a detector that always outputs nothing also achieves 0 FP here; the result is
+meaningful only jointly with the detection results above (the same pipeline does report findings
+when slices contain exploitable patterns, e.g., 21/30 reentrancy contracts), and with the mock
+heuristic's 12 raw findings on the same corpus (1 refuted by Foundry) as evidence that verification
+remains necessary for weaker reasoners.
 
-\textbf{Recall.} Verification filters aggressively and the strict-JSON contract is conservative;
-recall on the reentrancy subset (0.45) reflects Mythril's solver budget and single-pass reasoning.
-Budget scaling and multi-round reasoning are expected to trade compute for recall.
+\section{Threats to Validity and Limitations}
+\textbf{Single runs, no variance.} Every configuration was executed once. LLM outputs are
+non-deterministic even at temperature $0.2$; metrics on small subsets (e.g., 23 raw findings) carry
+run-to-run variance we do not quantify. Repeated runs with mean $\pm$ std are required before the
+reported gaps should be treated as precise.
+
+\textbf{Partial contract coverage under rate limits.} The DeFiHackLabs run completed analysis for
+16 of 30 contracts (14 lost to compile failures of historical exploit scaffolding and free-tier 429
+exhaustion); summaries report the achieved subset, not the full 30. Its labels cover only 1
+contract, so its P/R/F1 are not statistically meaningful and we report raw finding counts only.
+PoC exploit files embed the vulnerability's description in comments; any ``detection'' there is
+potentially contaminated and is treated as exploratory only.
 
 \textbf{Verification soundness.} Mythril verdicts are matched by SWC class against the LLM claim;
-Foundry harnesses use zero-value constructor arguments, which under-approximates storage-dependent
-protocols. Richer harness synthesis (initializer sequences, anvil fork state) is future work.
+this keyword/SWC matching is brittle and itself unvalidated. Foundry harnesses use zero-value
+constructor arguments, which under-approximates storage-dependent protocols. Richer harness
+synthesis (initializer sequences, anvil fork state) is future work.
 
-\textbf{Cost.} All real-LLM runs completed on Groq's free tier (8{,}000 tokens/minute,
-200{,}000 tokens/day), totalling $\approx$470k tokens across 304 contracts and $\approx$90 minutes
-wall time---consistent with the ``potato laptop'' deployment target. Free-tier daily quotas are the
-binding constraint for large sweeps; the pipeline's crash resilience and retry/backoff handle
-mid-run exhaustion without losing completed work.
+\textbf{Model heterogeneity.} Three different models were used across experiments (quota
+constraints of the free tier), so cross-experiment differences cannot be attributed purely to the
+method; within-experiment comparisons hold, and a controlled single-model sweep is planned.
+
+\textbf{Clean-set truncation.} 53/100 OpenZeppelin contracts are interfaces/libraries with no
+critical slices; the 0-FP claim applies to the 47 slice-bearing contracts the LLM reasoned about.
 
 \section{Conclusion}
-\system{} demonstrates that constraining LLM reasoning with statically derived program slices and
-closing the loop with symbolic execution converts an unreliable generator of vulnerability reports
-into a high-precision auditor: precision $1.00$ with zero FPs on the reentrancy benchmark and zero
-hallucinated findings on 100 clean contracts, at half the token cost. The pipeline is fully open
-source and reproducible on free-tier infrastructure.
+\system{} shows that constraining LLM reasoning with statically derived program slices and closing
+the loop with symbolic execution yields verified, low-false-positive auditing on clean code
+(0 findings on 47 slice-bearing OpenZeppelin contracts) and perfectly precise---if incomplete---
+reentrancy detection (P $1.00$, FP $0$). We deliberately report tool-only baselines: on
+single-class pattern benchmarks Slither remains stronger (F1 $0.85$ vs.\ $0.62$), and our
+class-wise breakdown exposes current blind spots (arithmetic, access control). The pipeline,
+including all tool-only baselines and per-class analyses, is fully open source and reproducible on
+free-tier infrastructure.
 
 \section*{Reproducibility}
 Code, per-experiment JSON summaries, and 300-DPI figures are available at the project repository:

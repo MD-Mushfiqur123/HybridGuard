@@ -43,25 +43,32 @@ Solidity file ──▶ Slither (AST/CFG/IR) ──▶ top-K critical slices ─
   100 contracts; 840 vs 2,033 avg tokens/contract on SmartBugs).
 - Raw summaries in `results/`, publication figures in `results/figures/`.
 
-## Real-LLM results (Groq API, free tier)
+## Real-LLM results (Groq API, free tier) with tool-only baselines
 
-Runs with real LLM backends on the Groq free tier (`HYBRIDGUARD_API_KEY`):
+Tool-only baselines (`scripts/run_baselines.py`, per-pragma solc resolution) and real-LLM runs on
+the Groq free tier (`HYBRIDGUARD_API_KEY`):
 
-| Experiment | Model | Dataset | Precision | Recall | F1 | FP | Verification |
-|---|---|---|---|---|---|---|---|
-| Reentrancy + Mythril | `openai/gpt-oss-120b` | SmartBugs reentrancy (31) | **1.00** | 0.45 | **0.62** | **0** | Mythril (100% coverage) |
-| Detection (sliced) | `openai/gpt-oss-20b` | SmartBugs curated (143) | **0.67** | 0.18 | 0.29 | 13 | none |
-| Clean baseline (FP-rate) | `qwen/qwen3.8-27b` | OpenZeppelin (100) | — | — | — | **0** (TN=100) | none |
-| Real-incident (exploratory) | `qwen/qwen3.8-27b` | DeFiHackLabs (30) | — | — | — | 3 raw (incl. BEC batchOverflow) | — |
+| Experiment | Backend | Dataset | Precision | Recall | F1 | FP |
+|---|---|---|---|---|---|---|
+| Slither-only | Slither detectors | SmartBugs reentrancy (31) | 1.00 | **0.74** | **0.85** | 0 |
+| Mythril-only | Mythril symbolic exec. | SmartBugs reentrancy (31) | see results JSON | | | |
+| Reentrancy + Mythril | `gpt-oss-120b` | SmartBugs reentrancy (31) | **1.00** | 0.45 | 0.62 | **0** |
+| Detection (sliced) | `gpt-oss-20b` | SmartBugs curated (143) | **0.67** | 0.18 | 0.29 | 13 |
+| Clean baseline | `qwen3.8-27b` | OpenZeppelin (100, 47 sliced) | — | — | — | **0** |
+| Real-incident (exploratory) | `qwen3.8-27b` | DeFiHackLabs (30, 16 ran) | — | — | — | 3 raw |
 
-- **Zero hallucinations on clean code**: with static slicing, the real LLM reports **0 findings across
-  100 clean OpenZeppelin contracts** — the core HybridGuard claim (slices + strict JSON + attack-path
-  reasoning suppress false positives) holds without any symbolic verification.
-- **Perfect precision with verification**: on SmartBugs reentrancy, every kept finding is a true
-  positive (P = 1.00, FP = 0); Mythril verification filters 39% of raw LLM findings.
-- Real-LLM detection keeps precision far above the mock heuristic baseline (0.67 vs 0.19) at the cost
-  of recall on 117 unseen bug classes — expected on a multi-class dataset with a single-run prompt.
-- Raw summaries: `results/*_groq_*.json`, figures: `results/figures/*_groq_fig.png`.
+**Honest reading (per our own strict review):**
+- On the single-class reentrancy subset **Slither alone is stronger (F1 0.85 vs 0.62)** — pattern
+  detectors win on well-studied bug classes. HybridGuard's value is complementary: every finding is
+  individually symbolically verified with an explicit attack path, and the LLM can reason about
+  classes pattern tools cannot express.
+- **Class-wise breakdown** (`results/sb_groq_detection_class_breakdown.json`): reentrancy 21/30
+  contracts hit with 0 FP, but arithmetic/access-control/randomness classes are near-blind spots.
+- **Clean-code 0 FP applies to the 47 slice-bearing contracts** the LLM actually reasoned about
+  (53/100 are interfaces/libraries that by design reach no LLM call).
+- All runs are single runs (no variance estimates); DeFiHackLabs numbers are exploratory (1 labeled
+  contract, PoC comments may contaminate findings).
+- Raw summaries: `results/*_groq_*.json`, class breakdown: `results/sb_groq_detection_class_breakdown.json`.
 
 ## Layout
 
